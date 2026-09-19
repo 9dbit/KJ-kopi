@@ -1,0 +1,83 @@
+name: Install HD hero v5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-hero-v5.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download HD hero assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/hero
+          curl -L --fail --silent --show-error 'https://ucfbd8709505021daf03663476bb.dl.dropboxusercontent.com/cd/0/get/DIbadoVD5-_AhKwsVJp5hdZaWuxixFSbvhIV1B4U-BGHPhEFBblR0riDueK7jT8udRKmmuYliKAasfidchRPZDMZo1Li-HM7_ZBDjfYpC-viG8lKkkOSeIrdLEpTZKrOn8vmJOsTEvaa9ArrDJ4nkvJkKjyIO_7Mi6CLcaXq8z0c5w/file?c_luid=f3923c08' -o public/hero/kang-jago-hero-model-v5.webp
+          curl -L --fail --silent --show-error 'https://uc0c6ebc308b1b584e44b2c48978.dl.dropboxusercontent.com/cd/0/get/DIYPxfxHbEMvQwoeESDZkHj8tY3RqcRvlvBAK3KBWhYpMHsLJ1RUsY46SUZ7DEXhxwzG3xGLPSbFxW4iHX6Qjuskf6ej4JWu6nIaPYVczGqjIizlsRatNDQkKMbyVciQjGPhFzZfbxNLRwnfFs7TKGDUd1eBmXp6MZdUUlx5cFUmfw/file?c_luid=f3923c08' -o public/hero/kang-jago-hero-product-v5.webp
+
+          model_size=$(wc -c < public/hero/kang-jago-hero-model-v5.webp)
+          product_size=$(wc -c < public/hero/kang-jago-hero-product-v5.webp)
+          echo "model_size=$model_size"
+          echo "product_size=$product_size"
+          test "$model_size" -gt 300000
+          test "$product_size" -gt 300000
+          node - <<'NODE'
+          const fs = require('fs');
+          for (const file of [
+            'public/hero/kang-jago-hero-model-v5.webp',
+            'public/hero/kang-jago-hero-product-v5.webp'
+          ]) {
+            const b = fs.readFileSync(file);
+            if (b.toString('ascii', 0, 4) !== 'RIFF' || b.toString('ascii', 8, 12) !== 'WEBP') {
+              throw new Error(`${file} is not a valid WebP`);
+            }
+          }
+          NODE
+
+      - name: Point storefront at HD assets and remove soft scaling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          main = Path('src/main.jsx')
+          text = main.read_text()
+          text = text.replace("/hero/kang-jago-model.jpg", "/hero/kang-jago-hero-model-v5.webp?v=20260919-hd5")
+          text = text.replace("/hero/kang-jago-product.jpg", "/hero/kang-jago-hero-product-v5.webp?v=20260919-hd5")
+          text = text.replace("loading={index === 0 ? 'eager' : 'lazy'}", "loading=\"eager\"\n              decoding=\"async\"\n              fetchPriority={index === 0 ? 'high' : 'auto'}")
+          main.write_text(text)
+
+          css = Path('src/hero.css')
+          c = css.read_text()
+          c = c.replace('transform:scale(1.025);transition:opacity .65s ease,transform 1.2s ease', 'transform:none;transition:opacity .45s ease')
+          c = c.replace('.heroSlide.active{opacity:1;transform:scale(1);z-index:1}', '.heroSlide.active{opacity:1;transform:none;z-index:1}')
+          css.write_text(c)
+          PY
+
+      - name: Build verification
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit installed HD assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/hero/kang-jago-hero-model-v5.webp public/hero/kang-jago-hero-product-v5.webp src/main.jsx src/hero.css
+          git rm .github/workflows/install-hero-v5.yml
+          git commit -m 'fix: install HD WebP hero assets and sharp loading flow'
+          git push origin HEAD:main
