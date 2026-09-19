@@ -28,16 +28,50 @@ export function initAnalytics() {
   }
 }
 
+function normalizeTikTokPayload(payload = {}) {
+  const contentIds = Array.isArray(payload.content_ids) ? payload.content_ids.map(String) : [];
+  const contents = Array.isArray(payload.contents)
+    ? payload.contents.map((item) => ({
+        content_id: String(item.content_id || item.id || ''),
+        content_type: item.content_type || 'product',
+        content_name: item.content_name,
+        quantity: Number(item.quantity || 1),
+        price: Number(item.price ?? item.item_price ?? 0),
+      })).filter((item) => item.content_id)
+    : contentIds.map((id) => ({
+        content_id: id,
+        content_type: payload.content_type || 'product',
+        content_name: payload.content_name,
+        quantity: Number(payload.quantity || 1),
+        price: Number(payload.price ?? payload.value ?? 0),
+      }));
+
+  return {
+    contents,
+    content_type: payload.content_type || 'product',
+    content_name: payload.content_name,
+    value: Number(payload.value || 0),
+    currency: payload.currency || 'IDR',
+  };
+}
+
 export function trackEvent(name, payload = {}) {
   if (typeof window === 'undefined') return;
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ event: name, ...payload });
 
   if (typeof window.gtag === 'function') window.gtag('event', name, payload);
+
   if (typeof window.fbq === 'function') {
     const metaMap = { view_product: 'ViewContent', add_to_cart: 'AddToCart', begin_checkout: 'InitiateCheckout', purchase: 'Purchase' };
     const metaEvent = metaMap[name];
     if (metaEvent) window.fbq('track', metaEvent, payload);
+  }
+
+  if (window.ttq && typeof window.ttq.track === 'function') {
+    const tiktokMap = { view_product: 'ViewContent', add_to_cart: 'AddToCart', begin_checkout: 'InitiateCheckout', purchase: 'Purchase' };
+    const tiktokEvent = tiktokMap[name];
+    if (tiktokEvent) window.ttq.track(tiktokEvent, normalizeTikTokPayload(payload));
   }
 }
 
