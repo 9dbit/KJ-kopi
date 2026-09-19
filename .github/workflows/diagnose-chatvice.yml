@@ -1,0 +1,25 @@
+name: Diagnose Chatvice widget
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-chatvice.yml'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check live page and widget script
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== LIVE PAGE HEADERS ==='
+          curl -sSIL --max-time 20 https://kopi-kang-jago-production.up.railway.app/ | sed -n '1,30p'
+          echo '=== LIVE PAGE SCRIPT TAG ==='
+          curl -sSL --max-time 20 https://kopi-kang-jago-production.up.railway.app/ | grep -n -i 'chatvice' || true
+          echo '=== CHATVICE SCRIPT HEADERS ==='
+          curl -sSIL --max-time 20 'https://chatvice.app/api/widget/chatvice.js?merchant=m_f894751b2c02fe1d&v=1789826150' | sed -n '1,40p'
+          echo '=== CHATVICE SCRIPT BODY (first 3000 chars) ==='
+          curl -sSL --max-time 20 'https://chatvice.app/api/widget/chatvice.js?merchant=m_f894751b2c02fe1d&v=1789826150' | head -c 3000
+          echo
