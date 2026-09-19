@@ -30,6 +30,8 @@ export function initAnalytics() {
 
 function normalizeTikTokPayload(payload = {}) {
   const contentIds = Array.isArray(payload.content_ids) ? payload.content_ids.map(String) : [];
+  const quantity = Number(payload.quantity || 1);
+  const unitPrice = Number(payload.price ?? (quantity > 0 ? Number(payload.value || 0) / quantity : payload.value) ?? 0);
   const contents = Array.isArray(payload.contents)
     ? payload.contents.map((item) => ({
         content_id: String(item.content_id || item.id || ''),
@@ -42,8 +44,8 @@ function normalizeTikTokPayload(payload = {}) {
         content_id: id,
         content_type: payload.content_type || 'product',
         content_name: payload.content_name,
-        quantity: Number(payload.quantity || 1),
-        price: Number(payload.price ?? payload.value ?? 0),
+        quantity,
+        price: unitPrice,
       }));
 
   return {
