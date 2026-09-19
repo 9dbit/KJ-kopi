@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { FALLBACK_PRODUCTS, getProducts } from './commerce/woocommerce';
-import { moneyToNumber, trackEvent } from './commerce/analytics';
+import { initAnalytics, moneyToNumber, trackEvent } from './commerce/analytics';
+import { goToCheckout } from './commerce/checkout';
+import { hasLiveCommerce } from './commerce/config';
 
 const steps = [
   ['01', 'Select', 'Biji kopi dipilih berdasarkan aroma, body, dan konsistensi karakter.'],
@@ -12,27 +14,39 @@ const steps = [
 ];
 
 const currency = (value) => `Rp${Number(value || 0).toLocaleString('id-ID')}`;
+const valueOf = (item) => Number(item?.priceValue || moneyToNumber(item?.price));
+const metaId = (item) => String(item?.catalogId || item?.id);
 
 function App() {
   const [products, setProducts] = useState(FALLBACK_PRODUCTS);
   const [cart, setCart] = useState([]);
   const [selected, setSelected] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutMessage, setCheckoutMessage] = useState('');
 
-  useEffect(() => { getProducts().then(setProducts); }, []);
+  useEffect(() => {
+    initAnalytics();
+    getProducts().then(setProducts);
+  }, []);
 
   const cartCount = useMemo(() => cart.reduce((sum, item) => sum + item.qty, 0), [cart]);
-  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + moneyToNumber(item.price) * item.qty, 0), [cart]);
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + valueOf(item) * item.qty, 0), [cart]);
 
-  const addToCart = (product, qty = 1) => {
+  const addToCart = (product, qty = 1, openDrawer = true) => {
     setCart((current) => {
       const found = current.find((item) => item.id === product.id);
       return found
         ? current.map((item) => item.id === product.id ? { ...item, qty: item.qty + qty } : item)
         : [...current, { ...product, qty }];
     });
-    trackEvent('add_to_cart', { content_ids: [String(product.id)], content_name: product.name, value: moneyToNumber(product.price) * qty, currency: 'IDR' });
-    setCartOpen(true);
+    trackEvent('add_to_cart', {
+      content_ids: [metaId(product)],
+      content_type: 'product',
+      content_name: product.name,
+      value: valueOf(product) * qty,
+      currency: 'IDR',
+    });
+    if (openDrawer) setCartOpen(true);
   };
 
   const updateQty = (id, qty) => {
@@ -45,12 +59,18 @@ function App() {
 
   const openProduct = (product) => {
     setSelected(product);
-    trackEvent('view_product', { content_ids: [String(product.id)], content_name: product.name, value: moneyToNumber(product.price), currency: 'IDR' });
+    trackEvent('view_product', {
+      content_ids: [metaId(product)],
+      content_type: 'product',
+      content_name: product.name,
+      value: valueOf(product),
+      currency: 'IDR',
+    });
   };
 
   const addBundle = () => {
     const bundle = products.slice(0, 3);
-    bundle.forEach((product) => addToCart(product, 1));
+    bundle.forEach((product) => addToCart(product, 1, false));
     setCartOpen(true);
   };
 
@@ -58,9 +78,14 @@ function App() {
     trackEvent('begin_checkout', {
       value: subtotal,
       currency: 'IDR',
-      contents: cart.map((item) => ({ id: String(item.id), quantity: item.qty, item_price: moneyToNumber(item.price) })),
+      content_ids: cart.map(metaId),
+      contents: cart.map((item) => ({ id: metaId(item), quantity: item.qty, item_price: valueOf(item) })),
     });
-    alert('Checkout foundation siap. Langkah berikutnya: sambungkan session/cart WooCommerce agar tombol ini membuka checkout WordPress live.');
+
+    const redirected = goToCheckout(cart);
+    if (!redirected) {
+      setCheckoutMessage('Checkout live belum diaktifkan. Masukkan URL WordPress/WooCommerce di Railway untuk mengaktifkan redirect checkout.');
+    }
   };
 
   return (
@@ -107,7 +132,7 @@ function App() {
         <div className="benefitGrid"><article><b>01</b><h3>Bold Taste</h3><p>Profil rasa tegas dan mudah dikenali.</p></article><article><b>02</b><h3>Ginseng Signature</h3><p>Diferensiasi produk yang kuat untuk komunikasi brand.</p></article><article><b>03</b><h3>Daily Energy Ritual</h3><p>Dibangun sebagai teman rutinitas aktif sehari-hari.</p></article><article><b>04</b><h3>Modern Indonesian</h3><p>Identitas lokal dengan visual dan experience premium.</p></article></div>
       </section>
 
-      <section id="products" className="products section"><div className="shell"><div className="productHead"><div><p className="eyebrow">SHOP KANG JAGO</p><h2>Pilih jagoanmu.</h2></div><span>WooCommerce-ready catalog</span></div><div className="productGrid">{products.map((p,i)=><article className="product" key={p.id || p.name}><button className="productVisual" type="button" onClick={() => openProduct(p)}>{p.image ? <img src={p.image} alt={p.name}/> : <div className={'miniPack p'+(i%3)}><small>KOPI</small><b>KANG<br/>JAGO</b><i>GINSENG</i></div>}</button><h3>{p.name}</h3><p>{p.note} • {p.weight}</p><div><strong>{p.price}</strong><button type="button" onClick={() => addToCart(p)} aria-label={`Tambah ${p.name}`}>+</button></div></article>)}</div></div></section>
+      <section id="products" className="products section"><div className="shell"><div className="productHead"><div><p className="eyebrow">SHOP KANG JAGO</p><h2>Pilih jagoanmu.</h2></div><span>{hasLiveCommerce() ? 'Live WooCommerce catalog' : 'WooCommerce-ready catalog'}</span></div><div className="productGrid">{products.map((p,i)=><article className="product" key={p.id || p.name}><button className="productVisual" type="button" onClick={() => openProduct(p)}>{p.image ? <img src={p.image} alt={p.name}/> : <div className={'miniPack p'+(i%3)}><small>KOPI</small><b>KANG<br/>JAGO</b><i>GINSENG</i></div>}</button><h3>{p.name}</h3><p>{p.note} • {p.weight}</p><div><strong>{p.price}</strong><button type="button" onClick={() => addToCart(p)} aria-label={`Tambah ${p.name}`}>+</button></div></article>)}</div></div></section>
 
       <section className="bundle shell section">
         <div className="bundleCard">
@@ -116,7 +141,7 @@ function App() {
         </div>
       </section>
 
-      <section className="commerce shell section"><div><p className="eyebrow">COMMERCE ENGINE</p><h2>Website custom di depan.<br/>WordPress bekerja di belakang.</h2></div><div><p>Produk, harga, stok, promo, dan order dapat dikelola melalui WooCommerce. Storefront ini membaca katalog melalui WooCommerce Store API dan tetap memiliki fallback lokal bila WordPress belum tersambung.</p><div className="chips"><span>WordPress</span><span>WooCommerce</span><span>Meta Catalog</span><span>Railway</span></div></div></section>
+      <section className="commerce shell section"><div><p className="eyebrow">COMMERCE ENGINE</p><h2>Website custom di depan.<br/>WordPress bekerja di belakang.</h2></div><div><p>Produk, harga, stok, promo, dan order dapat dikelola melalui WooCommerce. Storefront membaca katalog melalui WooCommerce Store API, memakai SKU sebagai catalog ID untuk Meta bila tersedia, dan mengirim cart payload ke checkout bridge WordPress.</p><div className="chips"><span>WordPress</span><span>WooCommerce</span><span>Meta Catalog</span><span>GA4</span><span>Railway</span></div></div></section>
 
       {selected && <div className="modalBackdrop" onClick={() => setSelected(null)}><section className="productModal productDetailModal" onClick={(e)=>e.stopPropagation()}><button className="close" onClick={()=>setSelected(null)}>×</button><div className="detailGrid"><div className="detailVisual">{selected.image ? <img src={selected.image} alt={selected.name}/> : <div className="detailPack"><small>KOPI</small><b>KANG<br/>JAGO</b><i>GINSENG COFFEE</i></div>}</div><div><p className="eyebrow">KOPI KANG JAGO</p><h2>{selected.name}</h2><p>{selected.note}</p><div className="tasteTags"><span>Bold</span><span>Ginseng</span><span>Daily Ritual</span></div><div className="modalFacts"><span>{selected.weight}</span><strong>{selected.price}</strong></div><button className="primary modalCta" onClick={()=>addToCart(selected)}>Tambah ke Keranjang</button><small className="detailFineprint">Detail ingredients, roast profile, origin, dan nutrition facts akan ditarik dari WooCommerce saat data final tersedia.</small></div></div></section></div>}
 
@@ -126,7 +151,7 @@ function App() {
         <div className="cartBody">
           {cart.length === 0 ? <div className="emptyCart"><b>Keranjang masih kosong.</b><p>Pilih jagoanmu dulu, baru kita gas ke checkout.</p></div> : cart.map((item) => <div className="cartItem" key={item.id}><div className="cartThumb">{item.image ? <img src={item.image} alt=""/> : <span>KJ</span>}</div><div className="cartItemInfo"><b>{item.name}</b><small>{item.price}</small><div className="qty"><button onClick={()=>updateQty(item.id,item.qty-1)}>−</button><span>{item.qty}</span><button onClick={()=>updateQty(item.id,item.qty+1)}>+</button></div></div><button className="remove" onClick={()=>updateQty(item.id,0)}>×</button></div>)}
         </div>
-        <div className="cartFooter"><div className="subtotal"><span>Subtotal</span><strong>{currency(subtotal)}</strong></div><button className="primary checkoutBtn" disabled={!cart.length} onClick={beginCheckout}>Lanjut Checkout</button><small>Shipping dan promo dihitung pada checkout WooCommerce.</small></div>
+        <div className="cartFooter"><div className="subtotal"><span>Subtotal</span><strong>{currency(subtotal)}</strong></div><button className="primary checkoutBtn" disabled={!cart.length} onClick={beginCheckout}>Lanjut Checkout</button>{checkoutMessage && <p className="checkoutNotice">{checkoutMessage}</p>}<small>Shipping dan promo dihitung pada checkout WooCommerce.</small></div>
       </aside>
 
       <footer><div className="shell"><div className="brand"><span>KJ</span> KOPI KANG JAGO</div><p>Bold coffee. Strong character.</p><small>© 2026 Kopi Kang Jago. Product claims subject to final formulation and regulatory approval.</small></div></footer>
