@@ -9,11 +9,11 @@ import { hasLiveCommerce } from './commerce/config';
 
 const heroSlides = [
   {
-    image: '/hero/kang-jago-model.jpg',
+    image: '/hero/kang-jago-hero-model-v5.webp?v=20260919-hd5',
     alt: 'Kang Jago Kopi Stamina bersama model pria dan wanita Asia',
   },
   {
-    image: '/hero/kang-jago-product.jpg',
+    image: '/hero/kang-jago-hero-product-v5.webp?v=20260919-hd5',
     alt: 'Produk Kang Jago Kopi Stamina dengan slogan Rasa Sensasional',
   },
 ];
@@ -160,7 +160,9 @@ function App() {
               src={slide.image}
               alt={slide.alt}
               className={`heroSlide ${index === heroIndex ? 'active' : ''}`}
-              loading={index === 0 ? 'eager' : 'lazy'}
+              loading="eager"
+              decoding="async"
+              fetchPriority={index === 0 ? 'high' : 'auto'}
             />
           ))}
           <div className="heroDots" aria-label="Pilih banner hero">
