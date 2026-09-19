@@ -23,8 +23,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p public/hero
-          curl -L --fail --silent --show-error 'https://ucfbd8709505021daf03663476bb.dl.dropboxusercontent.com/cd/0/get/DIbadoVD5-_AhKwsVJp5hdZaWuxixFSbvhIV1B4U-BGHPhEFBblR0riDueK7jT8udRKmmuYliKAasfidchRPZDMZo1Li-HM7_ZBDjfYpC-viG8lKkkOSeIrdLEpTZKrOn8vmJOsTEvaa9ArrDJ4nkvJkKjyIO_7Mi6CLcaXq8z0c5w/file?c_luid=f3923c08' -o public/hero/kang-jago-hero-model-v5.webp
-          curl -L --fail --silent --show-error 'https://uc0c6ebc308b1b584e44b2c48978.dl.dropboxusercontent.com/cd/0/get/DIYPxfxHbEMvQwoeESDZkHj8tY3RqcRvlvBAK3KBWhYpMHsLJ1RUsY46SUZ7DEXhxwzG3xGLPSbFxW4iHX6Qjuskf6ej4JWu6nIaPYVczGqjIizlsRatNDQkKMbyVciQjGPhFzZfbxNLRwnfFs7TKGDUd1eBmXp6MZdUUlx5cFUmfw/file?c_luid=f3923c08' -o public/hero/kang-jago-hero-product-v5.webp
+          curl -L --fail --silent --show-error 'https://uc0eb0ef89482312b015f3452e48.dl.dropboxusercontent.com/cd/0/get/DIZKkSU0nNhV-GlORnaTqCZIrMVu6hrwYw6W8YjKSLn_boDNOuHIpvH2buhSfwJ8RosTijKSfa0nAp43zKnaRfy8Dqcxu3IS-AkDw1WrcMuJbOATgcS3iDwD3s0u4FyXJhiMlrTWgxnE3y2y56pJWh8p6lB45-fqRJh3Ih33b-YX4g/file?c_luid=f3923c08' -o public/hero/kang-jago-hero-model-v5.webp
+          curl -L --fail --silent --show-error 'https://uc75141ca19fb96ca8e937b6267b.dl.dropboxusercontent.com/cd/0/get/DIZvjS4mwJPzw1m7XD_FG0wuf-a-edHZMhmESBe5qaynM4z8uF4oZ2Bi5ulX5kcvZJl_0yPsYR8Vf4oLJSbBeRtjVavz6kxOYDfYiz0sawGQHBuVKlHM0fXjsPs8tUeEQtDIV6eIg6trae1M03gsLrHtz1Ar7i9AXZP_phM4JyFeLQ/file?c_luid=f3923c08' -o public/hero/kang-jago-hero-product-v5.webp
 
           model_size=$(wc -c < public/hero/kang-jago-hero-model-v5.webp)
           product_size=$(wc -c < public/hero/kang-jago-hero-product-v5.webp)
@@ -68,7 +68,7 @@ jobs:
 
       - name: Build verification
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Commit installed HD assets
@@ -77,7 +77,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add public/hero/kang-jago-hero-model-v5.webp public/hero/kang-jago-hero-product-v5.webp src/main.jsx src/hero.css
+          git add public/hero/kang-jago-hero-model-v5.webp public/hero/kang-jago-hero-product-v5.webp src/main.jsx src/hero.css package-lock.json
           git rm .github/workflows/install-hero-v5.yml
           git commit -m 'fix: install HD WebP hero assets and sharp loading flow'
           git push origin HEAD:main
